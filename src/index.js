@@ -1038,7 +1038,7 @@ volumeControl.addEventListener('input', function(){
 
 //WAVEFORM SELECT
 const waveforms = document.getElementsByName('waveform');
-let waveform = "sine";
+let waveform = "custom";
 
 
 $('#waveFormSelect').on('change', function(e){
@@ -1288,6 +1288,256 @@ var currentPressed = [];
 
 var currentSynthNotes = {};
 
+
+function keyToNote(event){
+    switch (event.code){
+        case 'KeyA': return 'G/3';
+        case 'KeyW': return 'G#/3';
+        case 'KeyS': return 'A/3';
+        case 'KeyE': return 'A#/3';
+        case 'KeyD': return 'B/3';
+        case 'KeyF': return 'C/4';
+        case 'KeyT': return 'C#/4';
+        case 'KeyG': return 'D/4';
+        case 'KeyY': return 'D#/4';
+        case 'KeyH': return 'E/4';
+        case 'KeyJ': return 'F/4';
+        case 'KeyI': return 'F#/4';
+        case 'KeyK': return 'G/4';
+        case 'KeyO': return 'G#/4';
+        case 'KeyL': return 'A/4';
+        case 'KeyP': return 'A#/4';
+        case 'Semicolon': return 'B/4';
+        case 'Quote': return 'C/5';
+        case 'BracketRight': return 'C#/5';
+    }
+    return undefined;
+}
+
+var modifiers = {
+    'LeftShift': false,
+    'RightShift': false,
+    'LeftControl': false,
+    'RightControl': false,
+    'LeftAlt': false,
+    'RightAlt': false,
+}
+
+function onKeyPress(event, up) {
+    console.log(event.key, event.code, event.type);
+    if(event.type == 'keydown'){
+        if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Shift')){
+            modifiers['LeftShift'] = true;
+        }
+        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Shift')){
+            modifiers['RightShift'] = true;
+        }
+        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Control')){
+            modifiers['LeftControl'] = true;
+        }
+        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Control')){
+            modifiers['RightControl'] = true;
+        }
+        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Alt')){
+            modifiers['LeftAlt'] = true;
+        }
+        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Alt')){
+            modifiers['RightAlt'] = true;
+        }
+    }else if(event.type == 'keyup'){
+        if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Shift')){
+            modifiers['LeftShift'] = false;
+        }
+        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Shift')){
+            modifiers['RightShift'] = false;
+        }
+        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Control')){
+            modifiers['LeftControl'] = false;
+        }
+        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Control')){  
+            modifiers['RightControl'] = false;
+        }
+        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Alt')){
+            modifiers['LeftAlt'] = false;
+        }
+        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Alt')){
+            modifiers['RightAlt'] = false;
+        }
+    }
+
+
+    var note = keyToNote(event);
+    if (note == undefined){
+        // console.log('Key not mapped: ', event.code);
+        return;
+    }
+    console.log('Modifiers: ', modifiers);
+    console.log('Note: ', note);
+    var midiNote = noteToMidi(note) + 12;
+    console.log('Midi Note: ', midiNote);
+    if(modifiers['LeftShift']) midiNote -= 12;
+    if(modifiers['RightShift']) midiNote += 12;
+    // if (modifiers['LeftControl']) midiNote -= 24;
+    // if (modifiers['RightControl']) midiNote += 24;
+    if (modifiers['LeftAlt']) midiNote -= 24;
+    if (modifiers['RightAlt']) midiNote += 24;
+    note = noteToName(midiNote);
+
+    console.log('Note: ', note, ' Midi Note: ', midiNote);
+
+    if(event.type == 'keydown' && note != undefined && !currentPressed.includes(note)){
+        noteArray[note] = 127; // Set velocity to 127 for keydown
+        if(!currentPressed.includes(note)){
+            currentPressed.push(note);
+        }
+        // console.log('Key Down: ', note);
+
+
+        var noteString = [];
+        for (const [key, value] of Object.entries(noteArray)) {
+            // console.log(`${key}: ${value}`);
+            noteString.push(key);
+        }
+        for(const [key, value] of Object.entries(noteArray)){
+            var midi = noteToMidi(key) + 12;
+            // console.log('key: ', key, ' midi note:', midi);
+            // console.log(keys[midi])
+            keys[midi].element.classList.add('pressedKey');;
+            currentPressed.push(key);
+        }
+
+        if(notesAreEqual(noteString, outputNoteArray[0]['notes'][selectedNote])){
+            selectedNote = selectedNote + 1;
+            if(selectedNote == outputNoteArray[0]['notes'].length){
+                selectedNote = 0;
+                const prior = outputNoteArray.slice(-1)[0]
+                outputNoteArray.push(generatePattern(prior['dir'], prior['root'], prior['mode'], prior['scale']));
+                outputNoteArray.shift();
+                barCounter++;
+                // generatePattern();
+            }
+
+            highlightNotes(outputNoteArray[0]['notes'][selectedNote])
+            drawNotes(outputDiv, outputNoteArray, false);
+            highlightScaleNotes(outputNoteArray[0]['scaleNotes'])
+            // selectedNote = selectedNote % outputNoteArray[0]['notes'].length;
+        }
+
+        noteString = [];
+        for (const [key, value] of Object.entries(noteArray)) {
+            // console.log(`${key}: ${value}`);
+            noteString.push(`${key}[${value}]`);
+        }
+        document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
+        document.getElementById("outputText").innerHTML = 'You should press: ' + outputNoteArray[0]['notes'][selectedNote];
+
+        
+
+
+        drawNotes(inputDiv, noteArray, true);
+
+
+        if($('#synthEnableBox')[0].checked){
+            const osc = context.createOscillator();
+            const noteGain = context.createGain();
+            var startTime = context.currentTime;
+            noteGain.gain.setValueAtTime(0, 0);
+            var level = sustainLevel * 64 / 127;
+            var activeNoteCount = Object.keys(noteArray).length;
+            var dynamicLevel = Math.min(level, 0.8 / Math.max(1, activeNoteCount));
+            
+            noteGain.gain.linearRampToValueAtTime(dynamicLevel, startTime + noteLength * attackTime);
+
+            // noteGain.gain.linearRampToValueAtTime(level, startTime + noteLength * attackTime);
+
+            // noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
+            // noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
+
+            var lfoGain = context.createGain();
+            lfoGain.gain.setValueAtTime(vibratoAmount, 0);
+            lfoGain.connect(osc.frequency)
+
+            var lfo = context.createOscillator();
+            lfo.frequency.setValueAtTime(vibratoSpeed, 0);
+            lfo.start(0);
+            // lfo.stop(context.currentTime + noteLength);
+            lfo.connect(lfoGain); 
+            if(waveform == "custom")
+                osc.setPeriodicWave(customWaveform);
+            else
+                osc.type = waveform;
+            osc.frequency.setValueAtTime(pianoNotes[note], 0);
+            osc.start(0);
+            // osc.stop(context.currentTime + noteLength);
+            osc.connect(noteGain);
+
+            noteGain.connect(masterVolume);
+            noteGain.connect(delay);
+
+            currentSynthNotes[note] = [noteGain, lfo, osc, startTime, dynamicLevel];
+        }
+
+    }
+    else if(event.type == 'keyup' && note != undefined){
+        // console.log('Key Up: ', note);
+        if(noteArray.hasOwnProperty(note)){ // true
+            delete noteArray[note];
+            var midi = noteToMidi(note) + 12;
+            keys[midi].element.classList.remove('pressedKey');
+            currentPressed = currentPressed.filter(item => item !== note);
+        }
+        var noteString = [];
+        for (const [key, value] of Object.entries(noteArray)) {
+            // console.log(`${key}: ${value}`);
+            noteString.push(key);
+        }
+        if(notesAreEqual(noteString, outputNoteArray[0]['notes'][selectedNote])){
+            selectedNote = selectedNote + 1;
+            if(selectedNote == outputNoteArray[0]['notes'].length){
+                selectedNote = 0;
+                const prior = outputNoteArray.slice(-1)[0]
+                outputNoteArray.push(generatePattern(prior['dir'], prior['root'], prior['mode'], prior['scale']));
+                outputNoteArray.shift();
+                barCounter++;
+                // generatePattern();
+            }
+
+            highlightNotes(outputNoteArray[0]['notes'][selectedNote])
+            drawNotes(outputDiv, outputNoteArray, false);
+            highlightScaleNotes(outputNoteArray[0]['scaleNotes'])
+            // selectedNote = selectedNote % outputNoteArray[0]['notes'].length;
+        }
+
+        noteString = [];
+        for (const [key, value] of Object.entries(noteArray)) {
+            // console.log(`${key}: ${value}`);
+            noteString.push(`${key}[${value}]`);
+        }
+        document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
+        document.getElementById("outputText").innerHTML = 'You should press: ' + outputNoteArray[0]['notes'][selectedNote];
+
+        if ($('#synthEnableBox')[0].checked && note in currentSynthNotes){
+            var currentTime = context.currentTime;
+            var endTime = Math.max(currentTime, currentSynthNotes[note][3] + noteLength - noteLength * releaseTime) + noteLength* releaseTime
+            // var level = sustainLevel * message.data[2] / 127;
+            currentSynthNotes[note][0].gain.setValueAtTime(currentSynthNotes[note][4], endTime - noteLength * releaseTime);
+            currentSynthNotes[note][0].gain.linearRampToValueAtTime(0, endTime);
+            currentSynthNotes[note][2].stop(endTime);
+            currentSynthNotes[note][1].stop(endTime);
+            delete currentSynthNotes[note];
+        }
+        drawNotes(inputDiv, noteArray, true);
+
+
+
+    }
+
+}
+
+
+document.addEventListener('keydown', onKeyPress);
+document.addEventListener('keyup', onKeyPress);
+
 function onMIDIMessage (message) {
     let pressed = message.data[0] == 144 ? true : false;
     var noteName = noteToName(message.data[1]);
@@ -1365,7 +1615,14 @@ function onMIDIMessage (message) {
         const noteGain = context.createGain();
         var startTime = context.currentTime;
         noteGain.gain.setValueAtTime(0, 0);
-        noteGain.gain.linearRampToValueAtTime(sustainLevel, startTime + noteLength * attackTime);
+        var level = sustainLevel * message.data[2] / 127;
+        var activeNoteCount = Object.keys(noteArray).length;
+        var dynamicLevel = Math.min(level, 0.8 / Math.max(1, activeNoteCount));
+        
+        noteGain.gain.linearRampToValueAtTime(dynamicLevel, startTime + noteLength * attackTime);
+
+        // noteGain.gain.linearRampToValueAtTime(level, startTime + noteLength * attackTime);
+
         // noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
         // noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
 
@@ -1390,14 +1647,15 @@ function onMIDIMessage (message) {
         noteGain.connect(masterVolume);
         noteGain.connect(delay);
 
-        currentSynthNotes[noteName] = [noteGain, lfo, osc, startTime];
+        currentSynthNotes[noteName] = [noteGain, lfo, osc, startTime, dynamicLevel];
         }
     }
     else{
         if(noteName in currentSynthNotes){
             var currentTime = context.currentTime;
             var endTime = Math.max(currentTime, currentSynthNotes[noteName][3] + noteLength - noteLength * releaseTime) + noteLength* releaseTime
-            currentSynthNotes[noteName][0].gain.setValueAtTime(sustainLevel, endTime - noteLength * releaseTime);
+        // var level = sustainLevel * message.data[2] / 127;
+            currentSynthNotes[noteName][0].gain.setValueAtTime(currentSynthNotes[noteName][4], endTime - noteLength * releaseTime);
             currentSynthNotes[noteName][0].gain.linearRampToValueAtTime(0,endTime );
             // const noteGain = context.createGain();
             // noteGain.gain.linearRampToValueAtTime(sustainLevel, context.currentTime + noteLength * attackTime);
@@ -2757,6 +3015,7 @@ tempoControl.addEventListener('input', function() {
 }, false);
 
 function playSelectedNote(){
+    var systainLevel = 0.5;
     const osc = context.createOscillator();
     const noteGain = context.createGain();
     noteGain.gain.setValueAtTime(0, 0);
@@ -2792,14 +3051,14 @@ else
 
 }
 
-$('#playButton').on('click', function(e) {playSelectedNote();})
-$('#playButton2').on('click', function(e) {playSelectedNote();})
-$('#playButton3').on('click', function(e) {playSelectedNote();})
-$('#playButton4').on('click', function(e) {playSelectedNote();})
-$('#playButton5').on('click', function(e) {playSelectedNote();})
-$('#playButton6').on('click', function(e) {playSelectedNote();})
-$('#playButton7').on('click', function(e) {playSelectedNote();})
-$('#playButton8').on('click', function(e) {playSelectedNote();})
+$('#playButton').on('click', function(e) {playCurrentNote();})
+$('#playButton2').on('click', function(e) {playCurrentNote();})
+$('#playButton3').on('click', function(e) {playCurrentNote();})
+$('#playButton4').on('click', function(e) {playCurrentNote();})
+$('#playButton5').on('click', function(e) {playCurrentNote();})
+$('#playButton6').on('click', function(e) {playCurrentNote();})
+$('#playButton7').on('click', function(e) {playCurrentNote();})
+$('#playButton8').on('click', function(e) {playCurrentNote();})
 
 $('#startButton').on('click', function(e) {if (!isPlaying){isPlaying = true; noteLoop();}})
 $('#startButton2').on('click', function(e) {if (!isPlaying){isPlaying = true; noteLoop();}})
@@ -2857,44 +3116,48 @@ function playCurrentNote() {
     if(currentNoteIndex >= outputNoteArray[currentBarIndex]['notes'].flat().length)
         currentNoteIndex = 0;
     if(!Array.isArray(outputNoteArray[currentBarIndex]['notes'][currentNoteIndex])){
-    const osc = context.createOscillator();
-    const noteGain = context.createGain();
-    noteGain.gain.setValueAtTime(0, 0);
-    noteGain.gain.linearRampToValueAtTime(sustainLevel, context.currentTime + noteLength * attackTime);
-    noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
-    noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
+        console.log('playing single note', outputNoteArray[currentBarIndex]['notes'][currentNoteIndex]);
+        const osc = context.createOscillator();
+        const noteGain = context.createGain();
+        noteGain.gain.setValueAtTime(0, 0);
+        noteGain.gain.linearRampToValueAtTime(sustainLevel, context.currentTime + noteLength * attackTime);
+        noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
+        noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
 
-    var lfoGain = context.createGain();
-    lfoGain.gain.setValueAtTime(vibratoAmount, 0);
-    lfoGain.connect(osc.frequency)
+        var lfoGain = context.createGain();
+        lfoGain.gain.setValueAtTime(vibratoAmount, 0);
+        lfoGain.connect(osc.frequency)
 
-    var lfo = context.createOscillator();
-    lfo.frequency.setValueAtTime(vibratoSpeed, 0);
-    lfo.start(0);
-    lfo.stop(context.currentTime + noteLength);
-    lfo.connect(lfoGain); 
+        var lfo = context.createOscillator();
+        lfo.frequency.setValueAtTime(vibratoSpeed, 0);
+        lfo.start(0);
+        lfo.stop(context.currentTime + noteLength);
+        lfo.connect(lfoGain); 
 
-    if(waveform == "custom")
-    osc.setPeriodicWave(customWaveform);
-else
-    osc.type = waveform;
-
-
+        if(waveform == "custom")
+        osc.setPeriodicWave(customWaveform);
+    else
+        osc.type = waveform;
 
 
-    osc.frequency.setValueAtTime(pianoNotes[outputNoteArray[currentBarIndex]['notes'].flat()[currentNoteIndex]], 0);
-    osc.start(0);
-    osc.stop(context.currentTime + noteLength);
-    osc.connect(noteGain);
 
-    noteGain.connect(masterVolume);
-    noteGain.connect(delay);
+
+        osc.frequency.setValueAtTime(pianoNotes[outputNoteArray[currentBarIndex]['notes'].flat()[currentNoteIndex]], 0);
+        osc.start(0);
+        osc.stop(context.currentTime + noteLength);
+        osc.connect(noteGain);
+
+        noteGain.connect(masterVolume);
+        noteGain.connect(delay);
     }
     else{
+        console.log('playing note array', outputNoteArray[currentBarIndex]['notes'][currentNoteIndex]);
         for(var note of outputNoteArray[currentBarIndex]['notes'][currentNoteIndex]){
+            // console.log('playing note', note);
             const osc = context.createOscillator();
             const noteGain = context.createGain();
             noteGain.gain.setValueAtTime(0, 0);
+            sustainLevel = 0.5 / outputNoteArray[currentBarIndex]['notes'][currentNoteIndex].length;
             noteGain.gain.linearRampToValueAtTime(sustainLevel, context.currentTime + noteLength * attackTime);
             noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
             noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
